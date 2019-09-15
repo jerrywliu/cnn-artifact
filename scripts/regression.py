@@ -29,28 +29,6 @@ import tensorflow as tf
 from generators import regression_generator, make_batch, test_generator
 from aux_func import allImgs, get_freq_dict
 
-#Session variables
-experiment_path = '.'
-train_image_path = '../../bjpics' #bjpics, chinapics
-traindf = pd.read_csv(os.path.join(experiment_path, 'qingciqi_train.txt')) #'pbjyear_train.txt'))
-val_image_path = '../../bjpics'
-valdf = pd.read_csv(os.path.join(experiment_path, 'qingciqi_test.txt')) #'pbjyear_test.txt'))
-epoch_number = 1000
-do_batchTrain = True
-augment_batch = True
-batch_size = 16
-img_height = 224
-img_width = 224
-model_name = 'resnet' #vgg16, resnet, inception, load
-model_save_name = 'qingciqi_resnet2_feature_extraction'
-model_load = 'pbjyear_mq_vgg16_feature_extraction3'
-learning_rate = 1e-5
-decay = 1e-3
-momentum = 9e-1
-verbose = 1
-regularization = 0.1
-        
-
 def train_regression(gpus, experiment_path, train_df_path, train_image_path, val_df_path, val_image_path, y_name, augment_number,
                      model_type, model_save_name, epoch_number, learning_rate, decay, regularization, batch_size=32, img_height=224, img_width=224):
 
@@ -166,7 +144,7 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
                                         )
 
     #Save model parameters
-    model.save(os.path.join(experiment_path, './'+model_save_name+'/'+model_save_name+'.h5'))
+    model.save(os.path.join(experiment_path, model_save_name+'.h5'))
     
     #Plots
     loss = history.history['loss']
@@ -180,7 +158,7 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
     plt.ylabel('Loss')
     plt.xlabel('Epoch')
     plt.legend()
-    plt.savefig(os.path.join(experiment_path, './'+model_save_name+'/'+'loss.png'))
+    plt.savefig(os.path.join(experiment_path, 'loss.png'))
 
 #experiment_path/model_test_name/model_test_name.h5 = model being evaluated
 #Evaluates performance of model_test_name on test_df_path
@@ -201,7 +179,7 @@ def eval_regression(experiment_path, test_df_path, test_image_path, y_name, mode
     objpicsdf = pd.DataFrame(objpics, columns=['picID', 'objectID', 'categoryName', 'truth'], index=None)
     
     #Load model
-    model = load_model(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+'.h5'))
+    model = load_model(os.path.join(experiment_path, model_test_name+'.h5'))
 
     #Test generator
     eval_generator = test_generator(dataframe=testdf,
@@ -229,10 +207,10 @@ def eval_regression(experiment_path, test_df_path, test_image_path, y_name, mode
     
     #Test results file
     resultsdf = objpicsdf.join(guessyears)
-    resultsdf.to_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':test_results.txt'), encoding='utf-8', index=None, na_rep='NA')
+    resultsdf.to_csv(os.path.join(experiment_path, model_test_name+':test_results.txt'), encoding='utf-8', index=None, na_rep='NA')
     
     #Write summary of test results
-    with open(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':test_summary.txt'), 'w') as summary_writefile:
+    with open(os.path.join(experiment_path, model_test_name+':test_summary.txt'), 'w') as summary_writefile:
         summary_writefile.write('Prediction error mean in years: ' + mean + '\n')
         summary_writefile.write('Prediction error variance in years: ' + variance + '\n')
         
@@ -256,7 +234,7 @@ def predict_regression(experiment_path, test_df_path, test_image_path, model_tes
     objpicsdf = pd.DataFrame(objpics, columns=['picID', 'objectID'], index=None)
     
     #Load model
-    model = load_model(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+'.h5'))
+    model = load_model(os.path.join(experiment_path, model_test_name+'.h5'))
 
     #Test generator
     predict_generator = test_generator(dataframe=testdf,
@@ -279,5 +257,5 @@ def predict_regression(experiment_path, test_df_path, test_image_path, model_tes
     
     #Test results file
     resultsdf = objpicsdf.join(guessyears)
-    resultsdf.to_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':' + results_save_name + '.txt'), encoding='utf-8', index=None, na_rep='NA')
+    resultsdf.to_csv(os.path.join(experiment_path, model_test_name+':' + results_save_name + '.txt'), encoding='utf-8', index=None, na_rep='NA')
     

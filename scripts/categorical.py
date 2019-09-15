@@ -30,30 +30,6 @@ import tensorflow as tf
 from generators import categorical_generator, make_batch, test_generator
 from aux_func import numImgs, allImgs, get_freq_dict
 
-experiment_path = '.'
-train_image_path = '../../bjpics' #bjpics, chinapics
-traindf = pd.read_csv(os.path.join(experiment_path, 'qingciqiper_train.txt')) #cat, type
-val_image_path = '../../bjpics'
-valdf = pd.read_csv(os.path.join(experiment_path, 'qingciqiper_test.txt'))
-y_name = 'emperor'
-y_classes = set(traindf.loc[:, y_name])
-if np.nan in y_classes:
-    y_classes.remove(np.nan)
-epoch_number = 500
-do_batchTrain = True
-augment_batch = True
-batch_size = 32
-img_height = 224
-img_width = 224
-model_name = 'inception' #vgg16, resnet, inception, load
-model_save_name = 'qingciqiper_inception_feature_extraction'
-model_load = 'pbjtype_inception_feature_extraction'
-learning_rate = 1e-5
-decay = 1e-3
-momentum = 0.9
-verbose = 1
-regularization = 0.1
-
 #model_type = vgg16, resnet, inception
 #y_classes = categories used during training
 #Trains a model on data from train_df_path, cross-validating with val_df_path
@@ -75,7 +51,7 @@ def train_categorical(gpus, experiment_path, train_df_path, train_image_path, va
     numTrainImgs = numImgs(traindf, y_name, y_classes)
     numValImgs = numImgs(valdf, y_name, y_classes)
     
-    class_weight = list(map(lambda x: 1/x, y_classes))
+    class_weight = list(map(lambda x: 1/freq_dict[x], y_classes))
     
     #Generators
     train_generator = make_batch(generator='categorical',
@@ -163,7 +139,7 @@ def train_categorical(gpus, experiment_path, train_df_path, train_image_path, va
     multi_model.compile(optimizers.RMSprop(lr=learning_rate, decay=decay), loss='categorical_crossentropy', metrics=['accuracy'])
     
     history = multi_model.fit_generator(generator=train_generator,
-                                        steps_per_epoch=numTrainImgs,
+                                        steps_per_epoch=numTrainImgs//batch_size,
                                         validation_data=val_generator,
                                         validation_steps=numValImgs,
                                         class_weight=class_weight,
@@ -207,15 +183,6 @@ def train_categorical(gpus, experiment_path, train_df_path, train_image_path, va
     plt.legend()
     plt.savefig(os.path.join(experiment_path, 'loss.png'))
 
-#Session variables
-experiment_path = '.'
-image_path = '../../bjpics' #bjpics, chinapics
-testdf = pd.read_csv(os.path.join(experiment_path, 'largetype_test.txt'))
-y_name = 'typeName'
-model_test_name = 'largetype_inception_feature_extraction'
-labelindices = pd.read_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+'.txt'))
-classes = list(labelindices.loc[:, 'class'])
-
 #experiment_path/model_test_name/model_test_name.h5 = model being evaluated, experiment_path/model_test_name/model_test_name:indices.txt = class indices
 #Evaluates performance of model_test_name on test_df_path
 #Creates test results file at experiment_path/model_test_name/model_test_name:test_results.txt
@@ -225,7 +192,7 @@ def eval_categorical(experiment_path, test_df_path, test_image_path, y_name, mod
 
     #Session variables
     testdf = pd.read_csv(test_df_path)
-    labelindices = pd.read_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':indices.txt'))
+    labelindices = pd.read_csv(os.path.join(experiment_path, model_test_name+':indices.txt'))
     y_classes = list(labelindices.loc[:, 'class'])
     print('Classes in model ' + model_test_name + ': ' + str(y_classes))
     freq_dict = get_freq_dict(testdf, y_name, y_classes)
@@ -267,7 +234,7 @@ def eval_categorical(experiment_path, test_df_path, test_image_path, y_name, mod
     
     #Test results file
     resultsdf = objpicsdf.join(guessesdf.join(guessprobs))
-    resultsdf.to_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':test_results.txt'), encoding='utf-8', index=None, na_rep='NA')
+    resultsdf.to_csv(os.path.join(experiment_path, model_test_name+':test_results.txt'), encoding='utf-8', index=None, na_rep='NA')
     
     #Top k-accuracies by individual image
     k_accuracies = np.zeros(len(y_classes))
@@ -280,7 +247,7 @@ def eval_categorical(experiment_path, test_df_path, test_image_path, y_name, mod
         pic_truth = resultsdf.iloc[i].loc['truth']
         truthindex = y_classes.index(pic_truth)
         guessprob = list(guessprobs.iloc[i])
-        rankguesses = list(map(lambda x : guessprob.index(x), sorted(guessprob)))
+        rankguesses = list(map(lambda x : guessprob.index(x), sorted(guessprob, reverse=True)))
         for guess in range(len(rankguesses)):
             confusion_matrix[truthindex, rankguesses[guess]] += guess+1
         for k in range(1, len(y_classes)+1):
@@ -289,10 +256,10 @@ def eval_categorical(experiment_path, test_df_path, test_image_path, y_name, mod
     
     k_accuracies /= labeledExamples
     for i in range(confusion_matrix.shape[0]):
-        confusion_matrix[i] /= freq_dict[classes[i]]
+        confusion_matrix[i] /= freq_dict[y_classes[i]]
         
     #Write summary of test results
-    with open(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':test_summary.txt'), 'w') as summary_writefile:
+    with open(os.path.join(experiment_path, model_test_name+':test_summary.txt'), 'w') as summary_writefile:
         #k-accuracies per image
         summary_writefile.write('k-accuracies per image: \n')
         for k in range(len(k_accuracies)):
@@ -301,9 +268,9 @@ def eval_categorical(experiment_path, test_df_path, test_image_path, y_name, mod
         
         #Confusion matrix
         summary_writefile.write('Confusion matrix: nth most likely label to be assigned\n')
-        summary_writefile.write('Classes: ' + str(classes) + '\n')
+        summary_writefile.write('Classes: ' + str(y_classes) + '\n')
         for i in range(confusion_matrix.shape[0]):
-            summary_writefile.write(classes[i] + ': ' + str(confusion_matrix[i]) + '\n')
+            summary_writefile.write(y_classes[i] + ': ' + str(confusion_matrix[i]) + '\n')
         summary_writefile.write('\n')
         
     #Return accuracies by class
@@ -317,7 +284,7 @@ def predict_categorical(experiment_path, test_df_path, test_image_path, model_te
     
     #Session variables
     testdf = pd.read_csv(test_df_path)
-    labelindices = pd.read_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':indices.txt'))
+    labelindices = pd.read_csv(os.path.join(experiment_path, model_test_name+':indices.txt'))
     y_classes = list(labelindices.loc[:, 'class'])
     print('Classes in model ' + model_test_name + ': ' + str(y_classes))
     
@@ -329,7 +296,7 @@ def predict_categorical(experiment_path, test_df_path, test_image_path, model_te
     objpicsdf = pd.DataFrame(objpics, columns=['picID', 'objectID'], index=None)
     
     #Load model
-    model = load_model(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+'.h5'))
+    model = load_model(os.path.join(experiment_path, model_test_name+'.h5'))
 
     #Test generator
     predict_generator = test_generator(dataframe=testdf,
@@ -357,5 +324,5 @@ def predict_categorical(experiment_path, test_df_path, test_image_path, model_te
     
     #Predict results file
     resultsdf = objpicsdf.join(guessesdf.join(guessprobs))
-    resultsdf.to_csv(os.path.join(experiment_path, './'+model_test_name+'/'+model_test_name+':' + results_save_name + '.txt'), encoding='utf-8', index=None, na_rep='NA')
+    resultsdf.to_csv(os.path.join(experiment_path, model_test_name+':' + results_save_name + '.txt'), encoding='utf-8', index=None, na_rep='NA')
     

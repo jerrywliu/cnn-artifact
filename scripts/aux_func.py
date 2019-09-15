@@ -21,7 +21,7 @@ def split_objects(dataframe, outFile):
         split_df.append(df_object)
     
     returndf = pd.DataFrame(split_df, columns=dataframe.columns)
-    returndf.to_csv(path=outFile, columns=returndf.columns, na_rep='NA', encoding='utf-8', index=None)
+    returndf.to_csv(outFile, columns=returndf.columns, na_rep='NA', encoding='utf-8', index=None)
 
 #Helper method for creating frequency list
 def update_dictionary(dictionary, element):

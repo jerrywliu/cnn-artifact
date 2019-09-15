@@ -107,9 +107,9 @@ def categorical_generator(dataframe, image_path, y_name, y_classes=list(), augme
                                 height+32,
                                 width+32)
                         [aug_x, aug_y] = augment_image(image, y, augment_number, height, width)
-    
-                        x_train = np.append(x_train, aug_x, axis=0)
-                        y_train = np.append(y_train, aug_y)
+                        
+                        x_train = np.append(x_train, [aug_x], axis=0)
+                        y_train = np.append(y_train, [aug_y])
                     
                     #Get image and append to list of examples to yield if forTrain=False
                     else:
@@ -171,9 +171,9 @@ def regression_generator(dataframe, image_path, y_name, augment_number=1, height
                                 height+32,
                                 width+32)
                         [aug_x, aug_y] = augment_image(image, y, augment_number, height, width)
-    
-                        x_train = np.append(x_train, aug_x, axis=0)
-                        y_train = np.append(y_train, aug_y)
+                        
+                        x_train = np.append(x_train, [aug_x], axis=0)
+                        y_train = np.append(y_train, [aug_y])
                     
                     #Get image and append to list of examples to yield if forTrain=False
                     else:
@@ -235,7 +235,7 @@ def test_generator(dataframe, image_path, y_name=None, y_classes=None, include_N
     while True:
         
         #Get examples
-        for i in range(len(dataframe.shape[0])):
+        for i in range(len(dataframe)):
             
             #Skip image if not in y-classes
             if y_name != None and ((y_classes != None and not dataframe.iloc[i].loc[y_name] in y_classes) or (include_NA == False and pd.isna(dataframe.iloc[i].loc[y_name]))):
@@ -252,13 +252,13 @@ def test_generator(dataframe, image_path, y_name=None, y_classes=None, include_N
                             height,
                             width)
                     x_train = np.append(x_train, [image], axis=0)
-                    
-                    x_train = x_train / 255.0
 
-                    #Yield
-                    yield(x_train)
-                
                 #Error: failed to read pic
                 except:
                     print('\nError: failed to read ' + pic+'.jpg\n')
                     continue
+
+                x_train = x_train / 255.0
+
+                #Yield
+                yield(x_train)

@@ -25,7 +25,7 @@ def eval_CNN_categorical(experiment_name, trials, inFile, image_path, categoryNa
         
     top_1_accuracies = list()
     
-    for i in range(1, len(trials)+1):
+    for i in range(1, trials+1):
         
         trial_path = os.path.join(main_experiment_path, experiment_name, experiment_name+'_'+str(i))
         
@@ -34,17 +34,14 @@ def eval_CNN_categorical(experiment_name, trials, inFile, image_path, categoryNa
             os.mkdir(trial_path)
         except:
             print('Saving over trial ' + str(i) + ' of experiment ' + experiment_name)
-            
-        y_classes = train_val_split(inFile, outFile=os.path.join(trial_path, 'df'), categoryName=categoryName, numCat=numCat, val_prop=0.3)
+           
+        df = pd.read_csv(inFile)
+        split_objects(df, os.path.join(trial_path, 'splitdf.txt'))
+
+        y_classes = train_val_split(os.path.join(trial_path, 'splitdf.txt'), outFile=os.path.join(trial_path, 'df'), categoryName=categoryName, numCat=numCat, val_prop=0.3)
         
-        traindf = pd.read_csv(os.path.join(trial_path, 'df_train.txt'))
-        valdf = pd.read_csv(os.path.join(trial_path, 'df_val.txt'))
-        
-        split_objects(traindf, os.path.join(trial_path, 'splitdf_train.txt'))
-        split_objects(valdf, os.path.join(trial_path, 'splitdf_val.txt'))
-        
-        train_path = os.path.join(trial_path, 'splitdf_train.txt')
-        val_path = os.path.join(trial_path, 'splitdf_val.txt')
+        train_path = os.path.join(trial_path, 'df_train.txt')
+        val_path = os.path.join(trial_path, 'df_val.txt')
         
         #Train model i
         train_categorical(gpus=gpus,
@@ -86,12 +83,28 @@ def eval_CNN_categorical(experiment_name, trials, inFile, image_path, categoryNa
     
     #Write summary of test results
     with open(os.path.join(main_experiment_path, experiment_name, experiment_name+':experiment_summary.txt'), 'w') as summary_writefile:
-        summary_writefile.write('Prediction error mean in years: ' + mean + '\n')
-        summary_writefile.write('Prediction error variance in years: ' + variance + '\n')
+        summary_writefile.write('Prediction error mean in years: ' + str(mean) + '\n')
+        summary_writefile.write('Prediction error variance in years: ' + str(variance) + '\n')
         for i in range(1, len(top_1_accuracies)+1):
-            summary_writefile.write('Accuracy of model ' + str(i) + ': ' + top_1_accuracies[i] + '\n')
+            summary_writefile.write('Accuracy of model ' + str(i) + ': ' + str(top_1_accuracies[i-1]) + '\n')
         
     #Return test results summary
     return {'mean': mean,
             'variance': variance}
-        
+       
+print(eval_CNN_categorical(experiment_name='resnet_30cat',
+                            trials=2,
+                            inFile='../data/porcelain_dynasty.txt',
+                            image_path='../../../bjpics',
+                            categoryName='dynasty',
+                            numCat=4,
+                            gpus=2,
+                            model_type='vgg16',
+                            epoch_number=15,
+                            augment_number=1,
+                            learning_rate=1e-5,
+                            decay=1e-3,
+                            regularization=0.1,
+                            batch_size=32,
+                            img_height=224,
+                            img_width=224))
