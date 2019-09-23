@@ -95,7 +95,7 @@ def train_categorical(gpus, experiment_path, train_df_path, train_image_path, va
         with tf.device('/cpu:0'):
             model = Model(inputs=net_input, outputs=dense1)
     
-    elif model_name == 'resnet':
+    elif model_type == 'resnet':
         
         net_input = Input(shape=(img_height, img_width, 3))
         conv_base = ResNet50(
@@ -112,7 +112,7 @@ def train_categorical(gpus, experiment_path, train_df_path, train_image_path, va
         with tf.device('/cpu:0'):
             model = Model(inputs=net_input, outputs=dense1)
         
-    elif model_name == 'inception':
+    elif model_type == 'inception':
         
         net_input = Input(shape=(img_height, img_width, 3))
         conv_base = InceptionV3(
