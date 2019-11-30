@@ -19,6 +19,7 @@ from keras.layers import Input, Dense, Activation, Flatten, Dropout, BatchNormal
 from keras.layers import Conv2D, MaxPooling2D
 from keras.utils import multi_gpu_model
 from keras import regularizers, optimizers
+from keras import backend as K
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -33,15 +34,15 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
                      model_type, model_save_name, epoch_number, learning_rate, decay, regularization, batch_size=32, img_height=224, img_width=224):
 
 
-    checkpoint = ModelCheckpoint(os.path.join(experiment_path, './'+model_save_name+'/'+model_save_name+'.h5'), monitor='val_loss', verbose=verbose, save_best_only=False, save_weights_only=False, mode='auto', period=25)
+    checkpoint = ModelCheckpoint(os.path.join(experiment_path, model_save_name+'.h5'), monitor='val_loss', verbose=1, save_best_only=False, save_weights_only=False, mode='auto', period=25)
     callbacks = [checkpoint]
 
     #Session variables
     traindf = pd.read_csv(train_df_path)
     valdf = pd.read_csv(val_df_path)
     
-    numTrainImgs = allImgs(traindf, y_name, countNAs=False)
-    numValImgs = allImgs(valdf, y_name, countNAs=False)
+    numTrainImgs = allImgs(traindf, y_name, include_NA=False)
+    numValImgs = allImgs(valdf, y_name, include_NA=False)
     
     #Generators
     train_generator = make_batch(generator='regression',
@@ -67,7 +68,7 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
                                )
 
     #Model
-    if model_name == 'vgg16':
+    if model_type == 'vgg16':
     
         net_input = Input(shape=(img_height, img_width, 3))
         conv_base = VGG16(
@@ -84,7 +85,7 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
         with tf.device('/cpu:0'):
             model = Model(inputs=net_input, outputs=dense1)
     
-    elif model_name == 'resnet':
+    elif model_type == 'resnet':
         
         net_input = Input(shape=(img_height, img_width, 3))
         conv_base = ResNet50(
@@ -102,7 +103,7 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
             model = Model(inputs=net_input, outputs=dense1)
         
         
-    elif model_name == 'inception':
+    elif model_type == 'inception':
     
         net_input = Input(shape=(img_height, img_width, 3))
         conv_base = InceptionV3(
@@ -139,7 +140,7 @@ def train_regression(gpus, experiment_path, train_df_path, train_image_path, val
                                         validation_data=val_generator,
                                         validation_steps=numValImgs,
                                         epochs=epoch_number,
-                                        verbose=verbose,
+                                        verbose=1,
                                         callbacks=callbacks
                                         )
 
@@ -201,7 +202,7 @@ def eval_regression(experiment_path, test_df_path, test_image_path, y_name, mode
     guessyears = pd.DataFrame(testresults, columns=['pred'], index=None)
     
     #Errors
-    errors = np.array(guessyears.loc[:, 'pred'])-np.array(objpicsdf.loc[:, 'truth'])
+    errors = np.subtract(np.array(guessyears.loc[:, 'pred']), np.array(objpicsdf.loc[:, 'truth']).astype(float))
     mean = statistics.mean(errors)
     variance = statistics.variance(errors)
     
@@ -211,8 +212,8 @@ def eval_regression(experiment_path, test_df_path, test_image_path, y_name, mode
     
     #Write summary of test results
     with open(os.path.join(experiment_path, model_test_name+':test_summary.txt'), 'w') as summary_writefile:
-        summary_writefile.write('Prediction error mean in years: ' + mean + '\n')
-        summary_writefile.write('Prediction error variance in years: ' + variance + '\n')
+        summary_writefile.write('Prediction error mean in years: ' + str(mean) + '\n')
+        summary_writefile.write('Prediction error variance in years: ' + str(variance) + '\n')
         
     #Return test results summary
     return {'mean': mean,
